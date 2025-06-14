@@ -3,17 +3,43 @@ import * as cheerio from 'cheerio'
 import { CrawledPageData } from './analyzer'
 import { extractDomain } from './utils/analysisUtils'
 
-// Puppeteer 브라우저 설정
-const BROWSER_CONFIG = {
-  headless: true,
-  args: [
-    '--no-sandbox',
-    '--disable-setuid-sandbox',
-    '--disable-dev-shm-usage',
-    '--disable-accelerated-2d-canvas',
-    '--disable-gpu',
-    '--window-size=1920x1080'
-  ]
+// Vercel 환경에서 사용할 Chrome 바이너리
+let chromium: any = null
+try {
+  chromium = require('@sparticuz/chromium')
+} catch (error) {
+  console.log('Chromium package not available, using local Puppeteer')
+}
+
+// Puppeteer 브라우저 설정 (환경별)
+const getBrowserConfig = () => {
+  // Vercel 환경인 경우
+  if (process.env.VERCEL === '1' && chromium) {
+    return {
+      args: [
+        ...chromium.args,
+        '--hide-scrollbars',
+        '--disable-web-security',
+        '--disable-features=VizDisplayCompositor',
+      ],
+      defaultViewport: chromium.defaultViewport,
+      executablePath: chromium.executablePath,
+      headless: chromium.headless,
+    }
+  }
+  
+  // 로컬 환경
+  return {
+    headless: true,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-accelerated-2d-canvas',
+      '--disable-gpu',
+      '--window-size=1920x1080'
+    ]
+  }
 }
 
 // 타임아웃 설정
@@ -37,7 +63,7 @@ export async function crawlWebsiteWithPuppeteer(url: string): Promise<CrawledPag
     console.log(`🚀 크롤링 시작: ${url}`)
     
     // 브라우저 시작
-    browser = await puppeteer.launch(BROWSER_CONFIG)
+    browser = await puppeteer.launch(getBrowserConfig())
     page = await browser.newPage()
     
     // User Agent 설정
@@ -329,15 +355,15 @@ export async function crawlWebsiteWithFetch(url: string): Promise<CrawledPageDat
 export async function crawlWebsite(url: string): Promise<CrawledPageData> {
   console.log('📍 crawlWebsite 함수 호출됨:', url)
   
-  // 개발 환경에서는 Fetch 우선 사용 (빠름)
+  // 개발 환경에서는 빠른 Fetch 사용
   if (process.env.NODE_ENV === 'development') {
-    console.log('🔧 개발 모드: Fetch 크롤링 사용')
+    console.log('🔧 개발 모드: Fetch 크롤링 사용 (빠른 테스트)')
     return crawlWebsiteWithFetch(url)
   }
   
-  // 프로덕션에서는 Puppeteer 우선, 실패 시 Fetch
+  // 프로덕션 환경(Vercel 포함)에서는 Puppeteer 우선 시도
   try {
-    console.log('🚀 Puppeteer 크롤링 시도')
+    console.log('🚀 Puppeteer 크롤링 시도 (JavaScript 렌더링 포함)')
     return await crawlWebsiteWithPuppeteer(url)
   } catch (error) {
     console.warn('Puppeteer 실패, Fetch로 재시도:', error)
