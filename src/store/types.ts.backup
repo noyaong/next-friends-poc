@@ -1,0 +1,61 @@
+export interface AnalysisResult {
+  id: string
+  url: string
+  domain: string
+  status: 'analyzing' | 'completed' | 'failed'
+  
+  // SEO 점수들
+  seoScore: number
+  aiScore: number
+  performanceScore: number
+  
+  // 분석 결과 상세
+  issues: AnalysisIssue[]
+  suggestions: string[]
+  
+  // 메타 정보
+  analyzedAt: string
+  duration: number // 분석 소요 시간 (초)
+  
+  // SEO 요소들
+  seoData?: {
+    title: string
+    description: string
+    keywords: string[]
+    headings: { level: number; text: string }[]
+    images: { src: string; alt: string }[]
+    internalLinks: number
+    externalLinks: number
+    canonicalUrl?: string
+    ogTags: Record<string, string>
+    structuredData: any[]
+  }
+  
+  // 성능 데이터
+  performanceData?: {
+    lighthouse: {
+      performance: number
+      accessibility: number
+      bestPractices: number
+      seo: number
+    }
+    loadTime: number
+    pageSize: number
+  }
+}
+
+export interface AnalysisIssue {
+  id: string
+  type: 'error' | 'warning' | 'info'
+  category: 'seo' | 'performance' | 'accessibility' | 'ai-readiness'
+  title: string
+  description: string
+  suggestion: string
+  priority: 'high' | 'medium' | 'low'
+}
+
+export interface AnalysisProgress {
+  stage: 'crawling' | 'parsing' | 'analyzing' | 'generating-suggestions' | 'completed'
+  progress: number // 0-100
+  message: string
+}
