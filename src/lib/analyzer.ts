@@ -26,7 +26,10 @@ export interface CrawledPageData {
     loadComplete: number
     firstPaint: number
     firstContentfulPaint: number
+    htmlSize?: number
+    resourceCount?: number
   }
+  isSPA?: boolean
   error?: string
 }
 

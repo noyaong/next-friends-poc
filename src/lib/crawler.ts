@@ -327,7 +327,34 @@ export async function crawlWebsiteWithFetch(url: string): Promise<CrawledPageDat
       }
     })
     
-    console.log(`✅ Fetch 크롤링 완료: ${url}`)
+    // 개선된 성능 메트릭 (Fetch 기반)
+    const htmlSize = new Blob([html]).size
+    const resourceCount = (html.match(/<img|<script|<link|<style/g) || []).length
+    
+    const performanceMetrics = {
+      domContentLoaded: Math.max(100, loadTime * 0.7), // 추정값
+      loadComplete: loadTime,
+      firstPaint: Math.max(200, loadTime * 0.4), // 추정값
+      firstContentfulPaint: Math.max(300, loadTime * 0.6), // 추정값
+      htmlSize,
+      resourceCount
+    }
+    
+    // SPA 감지 및 경고
+    const isSPA = !!(
+      html.includes('react') || 
+      html.includes('vue') || 
+      html.includes('angular') ||
+      html.includes('ng-app') ||
+      $('div[id="root"], div[id="app"], div[id="__next"]').length > 0 ||
+      $('script[src*="bundle"]').length > 0
+    )
+    
+    if (isSPA && (!title || title === 'Loading...' || title.length < 10)) {
+      console.warn('⚠️ SPA 감지: JavaScript 렌더링이 필요할 수 있습니다')
+    }
+    
+    console.log(`✅ Fetch 크롤링 완료: ${url} (${loadTime}ms)${isSPA ? ' [SPA 감지]' : ''}`)
     
     return {
       url,
@@ -339,7 +366,9 @@ export async function crawlWebsiteWithFetch(url: string): Promise<CrawledPageDat
       links,
       metaTags,
       jsonLdData,
-      loadTime
+      loadTime,
+      performanceMetrics,
+      isSPA // SPA 여부 추가
     }
     
   } catch (error) {
@@ -362,10 +391,16 @@ export async function crawlWebsiteWithFetch(url: string): Promise<CrawledPageDat
 }
 
 /**
- * 메인 크롤링 함수 (Puppeteer 우선, 실패 시 Fetch 사용)
+ * 메인 크롤링 함수 (환경에 따라 적절한 방법 선택)
  */
 export async function crawlWebsite(url: string): Promise<CrawledPageData> {
   console.log('📍 crawlWebsite 함수 호출됨:', url)
+  
+  // Vercel 환경에서는 안정적인 Fetch 사용
+  if (process.env.VERCEL === '1') {
+    console.log('☁️ Vercel 환경: 안정적인 Fetch 크롤링 사용 (HTML + 메타데이터 분석)')
+    return crawlWebsiteWithFetch(url)
+  }
   
   // 개발 환경에서는 빠른 Fetch 사용
   if (process.env.NODE_ENV === 'development') {
@@ -373,9 +408,9 @@ export async function crawlWebsite(url: string): Promise<CrawledPageData> {
     return crawlWebsiteWithFetch(url)
   }
   
-  // 프로덕션 환경(Vercel 포함)에서는 Puppeteer 우선 시도
+  // 로컬 프로덕션 환경에서만 Puppeteer 시도
   try {
-    console.log('🚀 Puppeteer 크롤링 시도 (JavaScript 렌더링 포함)')
+    console.log('🚀 로컬 프로덕션: Puppeteer 크롤링 시도 (JavaScript 렌더링 포함)')
     return await crawlWebsiteWithPuppeteer(url)
   } catch (error) {
     console.warn('Puppeteer 실패, Fetch로 재시도:', error)
