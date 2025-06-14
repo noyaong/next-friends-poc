@@ -12,23 +12,35 @@ try {
 }
 
 // Puppeteer 브라우저 설정 (환경별)
-const getBrowserConfig = () => {
+const getBrowserConfig = async () => {
   // Vercel 환경인 경우
   if (process.env.VERCEL === '1' && chromium) {
-    return {
-      args: [
-        ...chromium.args,
-        '--hide-scrollbars',
-        '--disable-web-security',
-        '--disable-features=VizDisplayCompositor',
-      ],
-      defaultViewport: chromium.defaultViewport,
-      executablePath: chromium.executablePath,
-      headless: chromium.headless,
+    console.log('🏗️ Vercel 환경: Chromium 설정 사용')
+    
+    try {
+      return {
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-accelerated-2d-canvas',
+          '--disable-gpu',
+          '--hide-scrollbars',
+          '--disable-web-security',
+          '--disable-features=VizDisplayCompositor',
+        ],
+        defaultViewport: { width: 1920, height: 1080 },
+        executablePath: await chromium.executablePath,
+        headless: true,
+      }
+    } catch (error) {
+      console.error('Chromium 설정 실패:', error)
+      // 기본 설정으로 폴백
     }
   }
   
-  // 로컬 환경
+  // 로컬 환경 또는 Chromium 실패 시
+  console.log('💻 로컬 환경: 기본 Puppeteer 설정 사용')
   return {
     headless: true,
     args: [
@@ -63,7 +75,7 @@ export async function crawlWebsiteWithPuppeteer(url: string): Promise<CrawledPag
     console.log(`🚀 크롤링 시작: ${url}`)
     
     // 브라우저 시작
-    browser = await puppeteer.launch(getBrowserConfig())
+    browser = await puppeteer.launch(await getBrowserConfig())
     page = await browser.newPage()
     
     // User Agent 설정
